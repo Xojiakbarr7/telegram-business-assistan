@@ -270,7 +270,7 @@ def settings_from_process_env() -> tuple:
         os.environ.pop(key, None)
 
     try:
-        settings = load_settings(".env", require_telegram=False, source=source)
+        settings = load_settings(".env", require_telegram=True, source=source)
     except ConfigError as e:
         hint = f" ({e.hint})" if e.hint else ""
         print(f"Config error: {e}{hint}", file=sys.stderr)
