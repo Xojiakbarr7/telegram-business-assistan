@@ -8,7 +8,9 @@ import json
 import logging
 import os
 import sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
@@ -62,6 +64,31 @@ def check_env_permissions(env_path: Path) -> None:
         pass
 
 
+def start_health_server() -> None:
+    """Expose a tiny HTTP endpoint so Render Web Service can detect an open port."""
+    port = int(os.environ.get("PORT", "10000"))
+
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            if self.path.split("?", 1)[0] not in ("/", "/health"):
+                self.send_error(404)
+                return
+            payload = b"OK"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, format: str, *args) -> None:
+            # Avoid noisy Render health-check request logs.
+            pass
+
+    server = ThreadingHTTPServer(("0.0.0.0", port), HealthHandler)
+    Thread(target=server.serve_forever, daemon=True, name="healthcheck").start()
+    logger.info("Health endpoint listening on port %s", port)
+
+
 async def run_bot(settings) -> None:
     """Run the bot with polling."""
     setup_data_dirs(settings)
@@ -107,6 +134,9 @@ async def run_bot(settings) -> None:
 
     # Setup dispatcher
     dp = setup_dispatcher(assistant)
+
+    # Keep Render's Web Service alive while Telegram updates use long polling.
+    start_health_server()
 
     # Start polling
     try:
