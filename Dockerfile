@@ -41,6 +41,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the flat repository into a proper Python package.
 # Internal imports and relative imports use the assistant.* namespace.
 COPY . /app/assistant/
+# Support existing Render PROFILE_PATH=/app/profile.md settings.
+COPY profile.md /app/profile.md
 WORKDIR /app/assistant
 
 # Render Web Services also need the port served by bot.py (/health).
