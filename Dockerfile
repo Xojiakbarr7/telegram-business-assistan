@@ -3,10 +3,11 @@
 # The CLAUDE_VERSION should match the version verified locally with --check-claude
 # AI_PROVIDER: "claude" (installs Claude CLI) or "openrouter" (skips CLI install, smaller image)
 
+FROM python:3.12-slim
+
+# Build args must be declared inside the build stage to be usable in RUN.
 ARG CLAUDE_VERSION=1.0.58
 ARG AI_PROVIDER=claude
-
-FROM python:3.12-slim
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -14,6 +15,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DISABLE_AUTOUPDATER=1 \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+    PYTHONPATH="/app" \
     PATH="/root/.local/bin:${PATH}"
 
 # Install system dependencies
@@ -36,8 +38,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy the flat repository into a proper Python package.
+# Internal imports and relative imports use the assistant.* namespace.
+COPY . /app/assistant/
+WORKDIR /app/assistant
 
-# Run as root (Railway Volume mounts as root)
-CMD ["python", "bot.py", "--settings-from-env"]
+# Render Web Services also need the port served by bot.py (/health).
+EXPOSE 10000
+
+CMD ["python", "-m", "assistant.bot", "--settings-from-env"]
